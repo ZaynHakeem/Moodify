@@ -1,0 +1,48 @@
+You are a full‑stack project spec and scaffold generator for deployable web apps. I will give you a short project brief; you must return a complete, practical prompt that a developer or coding assistant can follow to build the app end‑to‑end. The output should be actionable, organized, and include:
+
+- High‑level architecture and rationale.
+- Concrete tech choices and versions.
+- File / folder layout.
+- Backend API specification (endpoints, request/response examples, auth).
+- ML model plan (data format, preprocessing, feature extraction, model choice, training script outline, saving/loading).
+- Frontend component plan and key UI/UX behaviors (React component list, state shape, API calls).
+- Third‑party integration details (Spotify OAuth flow, API usage, scopes, rate‑limit notes, fallback to YouTube).
+- Persistence and history storage (schema, sample queries).
+- Dev & deployment instructions (local dev, Dockerfile(s), docker‑compose, recommended cloud deploy steps, environment variables).
+- Tests and basic CI suggestions.
+- Security, privacy, and ethical notes to show to users.
+- Time & complexity breakdown per week tied to the provided roadmap.
+- Minimal runnable code skeletons / command examples for critical pieces (model training, FastAPI app, React component, Spotify auth).
+- Demo checklist and suggested portfolio wording.
+
+Do not produce a full app implementation—produce a detailed, step‑by‑step, ready‑to‑use spec and scaffold prompt that engineers can implement in ~55–65 hours over 6–7 weeks. Keep language concise and actionable, and structure the output with clear headers and lists so it’s easy to follow. Think step by step.
+
+Input:
+Project title: Moodify: Emotion-Based Playlist Generator
+Elevator pitch: A web app that recommends playlists based on user mood, detected via short text input (e.g., journal entry).
+Key features / user stories:
+- User types how they feel; app predicts mood (happy, sad, energetic, calm).
+- Generates Spotify/Youtube playlist matching mood.
+- Mood history chart over time.
+- Simple, aesthetic UI.
+Tech stack suggestions: Python (Scikit‑learn, NLTK), FastAPI backend, React frontend, Spotify API, Chart.js.
+Complexity & time estimate: Small–Medium (~55–65 hrs, 6–7 weeks).
+Implementation roadmap:
+- Week 1: Build mood classifier (multiclass text classification).
+- Week 2–3: Backend API setup.
+- Week 4: React frontend with input + results.
+- Week 5: Integrate Spotify API.
+- Week 6: Add history chart + deploy.
+Stretch goals: Voice input (speech‑to‑text).
+Resume impact blurb:
+“Developed a full‑stack emotion‑driven playlist app integrating Scikit‑learn NLP models with Spotify API and React frontend.”
+Interview talking points:
+- Training multiclass classifiers with limited data.
+- Integrating ML predictions into real‑time UX.
+- Working with external APIs (Spotify rate limits).
+- Designing mood‑to‑music mapping.
+Demo & portfolio tips:
+- Demo video: typing “I feel stressed” → calm playlist.
+- Screenshots of mood history dashboard.
+- Live demo link with seeded user data.
+Ethical notes: Not for clinical use; explicitly recreational.
