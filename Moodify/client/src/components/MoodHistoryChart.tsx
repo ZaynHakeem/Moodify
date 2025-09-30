@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import type { MoodType } from "./MoodDetectionDisplay";
-import { Heart, CloudRain, Zap, Wind } from "lucide-react";
+import { Heart, CloudRain, Zap, Wind, Flame, AlertCircle } from "lucide-react";
 
 interface MoodHistoryEntry {
   date: string;
@@ -19,6 +19,8 @@ const moodConfig = {
   sad: { color: "#60a5fa", icon: CloudRain, label: "Sad" },
   energetic: { color: "#f87171", icon: Zap, label: "Energetic" },
   calm: { color: "#34d399", icon: Wind, label: "Calm" },
+  angry: { color: "#ef4444", icon: Flame, label: "Angry" },
+  anxious: { color: "#eab308", icon: AlertCircle, label: "Anxious" },
 };
 
 export default function MoodHistoryChart({ history }: MoodHistoryChartProps) {
@@ -80,7 +82,7 @@ export default function MoodHistoryChart({ history }: MoodHistoryChartProps) {
         <Card className="p-4">
           <p className="text-sm text-muted-foreground mb-1">Mood Variety</p>
           <p className="text-2xl font-display font-bold" data-testid="text-mood-variety">
-            {stats.variety}/4
+            {stats.variety}/6
           </p>
         </Card>
       </div>
@@ -131,6 +133,22 @@ export default function MoodHistoryChart({ history }: MoodHistoryChartProps) {
                 stroke={moodConfig.calm.color}
                 strokeWidth={2}
                 dot={{ fill: moodConfig.calm.color }}
+                connectNulls
+              />
+              <Line
+                type="monotone"
+                dataKey="angry"
+                stroke={moodConfig.angry.color}
+                strokeWidth={2}
+                dot={{ fill: moodConfig.angry.color }}
+                connectNulls
+              />
+              <Line
+                type="monotone"
+                dataKey="anxious"
+                stroke={moodConfig.anxious.color}
+                strokeWidth={2}
+                dot={{ fill: moodConfig.anxious.color }}
                 connectNulls
               />
             </LineChart>

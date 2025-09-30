@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { z } from "zod";
-import { getPlaylistsForMood, type MoodType } from "./spotify";
+import { getPlaylistsForMood, getPersonalizedTracks, type MoodType } from "./spotify";
 
 const execFileAsync = promisify(execFile);
 
@@ -96,12 +96,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/playlists/:mood", async (req, res) => {
     try {
       const schema = z.object({
-        mood: z.enum(["happy", "sad", "energetic", "calm"]),
+        mood: z.enum(["happy", "sad", "energetic", "calm", "angry", "anxious"]),
       });
 
       const validation = schema.safeParse(req.params);
       if (!validation.success) {
-        return res.status(400).json({ error: "Invalid mood. Must be: happy, sad, energetic, or calm" });
+        return res.status(400).json({ error: "Invalid mood. Must be: happy, sad, energetic, calm, angry, or anxious" });
       }
 
       const { mood } = validation.data;
@@ -111,6 +111,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Playlist fetch error:", error);
       res.status(500).json({ error: "Failed to fetch playlists" });
+    }
+  });
+
+  // NEW: Personalized track recommendations using ML
+  app.get("/api/tracks/:mood", async (req, res) => {
+    try {
+      const schema = z.object({
+        mood: z.enum(["happy", "sad", "energetic", "calm", "angry", "anxious"]),
+        limit: z.coerce.number().int().min(10).max(50).optional().default(30),
+      });
+
+      const paramsValidation = schema.safeParse({
+        ...req.params,
+        ...req.query,
+      });
+
+      if (!paramsValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid parameters. Mood must be valid and limit between 10-50" 
+        });
+      }
+
+      const { mood, limit } = paramsValidation.data;
+      
+      console.log(`Fetching personalized tracks for mood: ${mood}`);
+      const tracks = await getPersonalizedTracks(mood as MoodType, limit);
+
+      res.json({ 
+        tracks,
+        mood,
+        count: tracks.length,
+        message: "Tracks ranked using scikit-learn ML algorithms"
+      });
+    } catch (error) {
+      console.error("Personalized tracks error:", error);
+      res.status(500).json({ error: "Failed to generate personalized tracks" });
     }
   });
 

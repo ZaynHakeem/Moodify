@@ -6,7 +6,7 @@ import { Sparkles } from "lucide-react";
 interface MoodInputProps {
   onSubmit: (text: string) => void;
   isLoading?: boolean;
-  currentMood?: "happy" | "sad" | "energetic" | "calm" | null;
+  currentMood?: "happy" | "sad" | "energetic" | "calm" | "angry" | "anxious" | null;
 }
 
 export default function MoodInput({ onSubmit, isLoading, currentMood }: MoodInputProps) {
@@ -25,6 +25,8 @@ export default function MoodInput({ onSubmit, isLoading, currentMood }: MoodInpu
       sad: "from-mood-sad/20",
       energetic: "from-mood-energetic/20",
       calm: "from-mood-calm/20",
+      angry: "from-red-500/20",
+      anxious: "from-yellow-500/20",
     };
     return `bg-gradient-to-br ${moodColors[currentMood]} to-background`;
   };

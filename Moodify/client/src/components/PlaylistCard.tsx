@@ -17,6 +17,8 @@ const moodColors = {
   sad: "from-mood-sad/60",
   energetic: "from-mood-energetic/60",
   calm: "from-mood-calm/60",
+  angry: "from-red-500/60",
+  anxious: "from-yellow-500/60",
 };
 
 export default function PlaylistCard({

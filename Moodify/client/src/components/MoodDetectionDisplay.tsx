@@ -1,8 +1,8 @@
 import { Badge } from "@/components/ui/badge";
-import { Heart, CloudRain, Zap, Wind } from "lucide-react";
+import { Heart, CloudRain, Zap, Wind, Flame, AlertCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
-export type MoodType = "happy" | "sad" | "energetic" | "calm";
+export type MoodType = "happy" | "sad" | "energetic" | "calm" | "angry" | "anxious";
 
 interface MoodPrediction {
   mood: MoodType;
@@ -41,6 +41,20 @@ const moodConfig = {
     color: "text-mood-calm",
     bgColor: "bg-mood-calm/10",
     borderColor: "border-mood-calm/30",
+  },
+  angry: {
+    icon: Flame,
+    label: "Angry",
+    color: "text-red-500",
+    bgColor: "bg-red-500/10",
+    borderColor: "border-red-500/30",
+  },
+  anxious: {
+    icon: AlertCircle,
+    label: "Anxious",
+    color: "text-yellow-500",
+    bgColor: "bg-yellow-500/10",
+    borderColor: "border-yellow-500/30",
   },
 };
 
