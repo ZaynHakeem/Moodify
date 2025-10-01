@@ -26,7 +26,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "python3",
         ["ml/predict.py", text],
         {
-          timeout: 10000,
+          timeout: 30000,
           maxBuffer: 512 * 1024,
         }
       );

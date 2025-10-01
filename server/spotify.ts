@@ -2,62 +2,50 @@ import { SpotifyApi } from "@spotify/web-api-ts-sdk";
 import { spawn } from "child_process";
 import path from "path";
 
-let connectionSettings: any;
+let spotifyClient: SpotifyApi | null = null;
+let tokenExpiry = 0;
 
-async function getAccessToken() {
-  if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
-    const refreshToken = connectionSettings?.settings?.oauth?.credentials?.refresh_token;
-    const accessToken = connectionSettings?.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
-    const clientId = connectionSettings?.settings?.oauth?.credentials?.client_id;
-    const expiresIn = connectionSettings.settings?.oauth?.credentials?.expires_in;
-    
-    return { accessToken, clientId, refreshToken, expiresIn };
-  }
-  
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
+async function getClientCredentialsToken() {
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
 
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+  if (!clientId || !clientSecret) {
+    throw new Error('Spotify credentials not configured. Check .env file');
   }
 
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=spotify',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-  
-  const refreshToken = connectionSettings?.settings?.oauth?.credentials?.refresh_token;
-  const accessToken = connectionSettings?.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
-  const clientId = connectionSettings?.settings?.oauth?.credentials?.client_id;
-  const expiresIn = connectionSettings.settings?.oauth?.credentials?.expires_in;
-  
-  if (!connectionSettings || (!accessToken || !clientId || !refreshToken)) {
-    throw new Error('Spotify not connected');
-  }
-  
-  return {accessToken, clientId, refreshToken, expiresIn};
+  const response = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': 'Basic ' + Buffer.from(clientId + ':' + clientSecret).toString('base64')
+    },
+    body: 'grant_type=client_credentials'
+  });
+
+  const data = await response.json();
+  return {
+    access_token: data.access_token,
+    expires_in: data.expires_in
+  };
 }
 
 export async function getUncachableSpotifyClient() {
-  const {accessToken, clientId, refreshToken, expiresIn} = await getAccessToken();
+  const now = Date.now();
+  
+  if (!spotifyClient || now >= tokenExpiry) {
+    const { access_token, expires_in } = await getClientCredentialsToken();
+    
+    spotifyClient = SpotifyApi.withAccessToken(process.env.SPOTIFY_CLIENT_ID!, {
+      access_token,
+      token_type: "Bearer",
+      expires_in,
+      refresh_token: ""
+    });
+    
+    tokenExpiry = now + (expires_in * 1000) - 60000;
+  }
 
-  const spotify = SpotifyApi.withAccessToken(clientId, {
-    access_token: accessToken,
-    token_type: "Bearer",
-    expires_in: expiresIn || 3600,
-    refresh_token: refreshToken,
-  });
-
-  return spotify;
+  return spotifyClient;
 }
 
 export type MoodType = "happy" | "sad" | "energetic" | "calm" | "angry" | "anxious";

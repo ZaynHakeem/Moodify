@@ -3,6 +3,7 @@ import Header from "@/components/Header";
 import MoodInput from "@/components/MoodInput";
 import MoodDetectionDisplay, { type MoodType } from "@/components/MoodDetectionDisplay";
 import PlaylistCard from "@/components/PlaylistCard";
+import TrackCard from "@/components/TrackCard";
 import MoodHistoryChart from "@/components/MoodHistoryChart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +38,8 @@ export default function Home() {
   const [currentMood, setCurrentMood] = useState<MoodType | null>(null);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
+  const [tracks, setTracks] = useState<any[]>([]);
+  const [loadingTracks, setLoadingTracks] = useState(false);
   const [history, setHistory] = useState<MoodHistoryEntry[]>([]);
   const { toast } = useToast();
 
@@ -76,9 +79,30 @@ export default function Home() {
     }
   };
 
+  const fetchTracks = async (mood: MoodType) => {
+    setLoadingTracks(true);
+    try {
+      const response = await fetch(`/api/tracks/${mood}?limit=30`);
+      const data = await response.json();
+      if (data.tracks) {
+        setTracks(data.tracks);
+      }
+    } catch (error) {
+      console.error('Failed to fetch tracks:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load track recommendations. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingTracks(false);
+    }
+  };
+
   const handleMoodSubmit = async (text: string) => {
     setIsDetecting(true);
     setPlaylists([]);
+    setTracks([]);
 
     try {
       const response = await fetch('/api/mood/detect', {
@@ -92,7 +116,10 @@ export default function Home() {
       if (data.predictions) {
         setDetectedMood(data.predictions);
         setCurrentMood(data.mood);
-        await fetchPlaylists(data.mood);
+        await Promise.all([
+          fetchPlaylists(data.mood),
+          fetchTracks(data.mood)
+        ]);
         await fetchHistory();
       }
     } catch (error) {
@@ -174,6 +201,46 @@ export default function Home() {
                       imageUrl={playlist.imageUrl || undefined}
                       spotifyUrl={playlist.spotifyUrl || undefined}
                       mood={playlist.mood}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {detectedMood && tracks.length > 0 && (
+          <section className="py-16 px-6 md:px-12 bg-card/30">
+            <div className="max-w-6xl mx-auto space-y-8">
+              <div className="text-center space-y-2">
+                <h3 className="text-3xl md:text-4xl font-display font-bold">
+                  AI-Recommended Tracks
+                </h3>
+                <p className="text-muted-foreground">
+                  Personalized using machine learning based on your {currentMood} mood
+                </p>
+                <p className="text-xs text-muted-foreground italic">
+                  Ranked using scikit-learn clustering algorithms
+                </p>
+              </div>
+
+              {loadingTracks ? (
+                <div className="text-center py-12">
+                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent" />
+                  <p className="mt-4 text-muted-foreground">Analyzing tracks with ML...</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
+                  {tracks.slice(0, 10).map((track, index) => (
+                    <TrackCard
+                      key={track.id || index}
+                      name={track.name}
+                      artist={track.artist}
+                      album={track.album}
+                      imageUrl={track.imageUrl}
+                      spotifyUrl={track.spotifyUrl}
+                      moodMatchPercentage={track.mood_match_percentage}
+                      duration_ms={track.duration_ms}
                     />
                   ))}
                 </div>

@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-Improved mood prediction using pre-trained transformers.
-Much more accurate than the basic scikit-learn model.
+Improved mood prediction using GoEmotions model trained on Reddit.
+Better at handling colloquial and informal language.
 """
 
 import sys
 import json
 from transformers import pipeline
 
-# Initialize emotion classifier (downloads model on first run)
 emotion_classifier = None
 
 def get_classifier():
@@ -17,14 +16,14 @@ def get_classifier():
     if emotion_classifier is None:
         emotion_classifier = pipeline(
             "text-classification",
-            model="j-hartmann/emotion-english-distilroberta-base",
+            model="SamLowe/roberta-base-go_emotions",
             top_k=None
         )
     return emotion_classifier
 
 def predict_mood(text):
     """
-    Predict mood from text using state-of-the-art transformer model.
+    Predict mood from text using GoEmotions model.
     
     Args:
         text: Input text to analyze
@@ -34,134 +33,87 @@ def predict_mood(text):
     """
     classifier = get_classifier()
     
-    # Preprocess to handle common phrases the model might miss
-    text_lower = text.lower()
-    
-    # Strong anger indicators
-    anger_phrases = [
-        'fed up', 'pissed off', 'sick of', 'furious', 'livid', 'enraged',
-        'sick and tired', 'had enough', 'done with', 'so mad', 'ticked off',
-        'irritated', 'frustrated', 'annoyed', 'aggravated'
-    ]
-    
-    # Anxiety indicators
-    anxiety_phrases = [
-        'stressed out', 'overwhelmed', 'worried sick', 'panicking',
-        'on edge', 'freaking out', 'nervous wreck', 'can\'t stop worrying',
-        'anxious about', 'scared about', 'terrified'
-    ]
-    
-    # Happiness indicators
-    happy_phrases = [
-        'over the moon', 'on cloud nine', 'thrilled', 'ecstatic', 'pumped',
-        'so happy', 'super excited', 'feeling great', 'amazing day',
-        'best day ever', 'grateful', 'blessed'
-    ]
-    
-    # Sadness indicators
-    sad_phrases = [
-        'heartbroken', 'devastated', 'miserable', 'depressed', 'hopeless',
-        'feel empty', 'feel numb', 'crying', 'can\'t stop crying', 'lonely',
-        'feel alone', 'missing', 'grief'
-    ]
-    
-    # Energy indicators
-    energy_phrases = [
-        'pumped up', 'fired up', 'ready to go', 'full of energy', 'hyped',
-        'let\'s go', 'bring it on', 'unstoppable', 'motivated', 'charged up'
-    ]
-    
-    # Calm indicators
-    calm_phrases = [
-        'peaceful', 'relaxed', 'serene', 'tranquil', 'at ease', 'content',
-        'zen', 'mellow', 'chilled out', 'laid back'
-    ]
-    
-    # Physical state indicators (not emotional)
-    tired_phrases = ['tired', 'sleepy', 'drowsy', 'exhausted', 'need sleep', 'need rest']
-    
     # Get predictions from model
-    results = classifier(text[:512])[0]  # Limit text length
+    results = classifier(text[:512])[0]
     
     # Sort by confidence
     results = sorted(results, key=lambda x: x['score'], reverse=True)
     
-    # Map emotion labels to mood categories for Spotify
+    # Map GoEmotions labels (28 emotions) to your 6 mood categories
     label_mapping = {
+        # Happy
         'joy': 'happy',
+        'amusement': 'happy',
+        'excitement': 'happy',
+        'love': 'happy',
+        'gratitude': 'happy',
+        'approval': 'happy',
+        'admiration': 'happy',
+        'pride': 'happy',
+        'relief': 'happy',
+        'optimism': 'happy',
+        
+        # Sad
         'sadness': 'sad',
+        'grief': 'sad',
+        'remorse': 'sad',
+        'disappointment': 'sad',
+        'embarrassment': 'sad',
+        
+        # Angry
         'anger': 'angry',
-        'fear': 'anxious',
-        'surprise': 'energetic',
+        'annoyance': 'angry',
+        'disapproval': 'angry',
         'disgust': 'angry',
-        'neutral': 'calm'
+        
+        # Anxious
+        'fear': 'anxious',
+        'nervousness': 'anxious',
+        'confusion': 'anxious',
+        
+        # Energetic
+        'desire': 'energetic',
+        'caring': 'energetic',
+        'curiosity': 'energetic',
+        
+        # Calm
+        'neutral': 'calm',
+        'realization': 'calm',
+        'surprise': 'calm',
     }
     
     # Get primary emotion
     primary = results[0]
     mapped_mood = label_mapping.get(primary['label'], 'calm')
     
-    # Post-processing: Handle common phrases the model might misclassify
-    detected_phrases = {
-        'angry': any(phrase in text_lower for phrase in anger_phrases),
-        'anxious': any(phrase in text_lower for phrase in anxiety_phrases),
-        'happy': any(phrase in text_lower for phrase in happy_phrases),
-        'sad': any(phrase in text_lower for phrase in sad_phrases),
-        'energetic': any(phrase in text_lower for phrase in energy_phrases),
-        'calm': any(phrase in text_lower for phrase in calm_phrases),
-    }
-    
-    # Strong override for clear anger/anxiety phrases (common misclassifications)
-    if detected_phrases['angry'] and mapped_mood != 'angry':
-        for result in results:
-            if label_mapping.get(result['label']) == 'angry':
-                primary = result
-                mapped_mood = 'angry'
-                break
-    elif detected_phrases['anxious'] and mapped_mood not in ['anxious', 'angry']:
-        for result in results:
-            if label_mapping.get(result['label']) == 'anxious':
-                primary = result
-                mapped_mood = 'anxious'
-                break
-    # For other moods, only override if model confidence is low
-    elif primary['score'] < 0.6:
-        for mood, detected in detected_phrases.items():
-            if detected and mood not in ['angry', 'anxious']:  # Already handled above
-                for result in results:
-                    if label_mapping.get(result['label']) == mood:
-                        primary = result
-                        mapped_mood = mood
-                        break
-                break
-    
-    # Handle physical tiredness (not emotional sadness)
-    if any(phrase in text_lower for phrase in tired_phrases) and mapped_mood == 'sad':
-        # Check if there are actual sad indicators
-        sad_indicators = ['depressed', 'hopeless', 'miserable', 'heartbroken', 'lonely', 'empty']
-        if not any(word in text_lower for word in sad_indicators):
-            mapped_mood = 'calm'
-    
-    # Format all predictions
-    all_predictions = []
+    # Aggregate predictions by mood
+    # Aggregate predictions by mood (take MAX instead of SUM to avoid exceeding 100%)
+    mood_scores = {}
     for result in results:
-        mood = label_mapping.get(result['label'], result['label'])
-        # Combine duplicate moods (e.g., anger + disgust both map to angry)
-        existing = next((p for p in all_predictions if p['mood'] == mood), None)
-        if existing:
-            existing['confidence'] = max(existing['confidence'], round(result['score'] * 100, 2))
-        else:
-            all_predictions.append({
-                'mood': mood,
-                'confidence': round(result['score'] * 100, 2)
-            })
+        mood = label_mapping.get(result['label'], 'calm')
+        if mood not in mood_scores:
+            mood_scores[mood] = 0
+        # Use max score instead of summing to keep percentages realistic
+        mood_scores[mood] = max(mood_scores[mood], result['score'])
     
-    # Re-sort after combining
+    # Create all_predictions with aggregated scores
+    all_predictions = [
+        {
+            'mood': mood,
+            'confidence': round(score * 100, 2)
+        }
+        for mood, score in mood_scores.items()
+    ]
+    
+    # Sort by aggregated confidence
     all_predictions.sort(key=lambda x: x['confidence'], reverse=True)
     
+    # Use the highest aggregated score as primary
+    primary_from_aggregated = all_predictions[0]
+    
     return {
-        'mood': mapped_mood,
-        'confidence': round(primary['score'] * 100, 2),
+        'mood': primary_from_aggregated['mood'],
+        'confidence': primary_from_aggregated['confidence'],
         'all_predictions': all_predictions
     }
 
