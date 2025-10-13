@@ -22,6 +22,10 @@ async function getClientCredentialsToken() {
     body: 'grant_type=client_credentials'
   });
 
+  if (!response.ok) {
+    throw new Error(`Failed to get Spotify token: ${response.status} ${response.statusText}`);
+  }
+
   const data = await response.json();
   return {
     access_token: data.access_token,
@@ -137,18 +141,21 @@ export async function getPlaylistsForMood(mood: MoodType): Promise<Playlist[]> {
       try {
         const result = await spotify.search(query, ["playlist"], undefined, 5);
         
-        if (result.playlists.items) {
+        if (result.playlists.items && result.playlists.items.length > 0) {
           for (const playlist of result.playlists.items) {
-            playlists.push({
-              id: playlist.id,
-              name: playlist.name,
-              description: playlist.description || "",
-              trackCount: (playlist as any).tracks?.total || 0,
-              imageUrl: playlist.images[0]?.url || null,
-              spotifyUrl: playlist.external_urls.spotify,
-              owner: playlist.owner.display_name || null,
-              mood,
-            });
+            // Add null checks to prevent crashes
+            if (playlist && playlist.id) {
+              playlists.push({
+                id: playlist.id,
+                name: playlist.name || "Unnamed Playlist",
+                description: playlist.description || "",
+                trackCount: (playlist as any).tracks?.total || 0,
+                imageUrl: playlist.images?.[0]?.url || null,
+                spotifyUrl: playlist.external_urls?.spotify || null,
+                owner: playlist.owner?.display_name || null,
+                mood,
+              });
+            }
           }
         }
       } catch (error) {
@@ -171,40 +178,25 @@ export async function getPlaylistsForMood(mood: MoodType): Promise<Playlist[]> {
   }
 }
 
-// NEW: Get personalized track recommendations using scikit-learn
+// NEW: Get personalized track recommendations
 export async function getPersonalizedTracks(mood: MoodType, limit: number = 30) {
   try {
     const spotify = await getUncachableSpotifyClient();
     const features = moodAudioFeatures[mood];
     
-    // Get seed tracks from multiple sources
+    // Get seed tracks from search (Client Credentials flow only allows search)
     const tracks: any[] = [];
     
-    // 1. Search for tracks by mood + genre
+    // Search for tracks by mood + genre
     for (const genre of features.genres.slice(0, 3)) {
       try {
         const searchResult = await spotify.search(`${mood} ${genre}`, ["track"], undefined, 20);
-        if (searchResult.tracks.items) {
-          tracks.push(...searchResult.tracks.items);
+        if (searchResult.tracks?.items && searchResult.tracks.items.length > 0) {
+          tracks.push(...searchResult.tracks.items.filter(t => t && t.id));
         }
       } catch (error) {
         console.error(`Error searching tracks for ${genre}:`, error);
       }
-    }
-    
-    // 2. Get recommendations using Spotify's recommendation API
-    try {
-      const seedTracks = tracks.slice(0, 5).map(t => t.id).filter(Boolean);
-      if (seedTracks.length > 0) {
-        const recommendations = await spotify.recommendations.get({
-          seed_tracks: seedTracks,
-          limit: 50,
-          ...features,
-        });
-        tracks.push(...recommendations.tracks);
-      }
-    } catch (error) {
-      console.error("Error getting Spotify recommendations:", error);
     }
     
     // Remove duplicates
@@ -212,29 +204,28 @@ export async function getPersonalizedTracks(mood: MoodType, limit: number = 30) 
       new Map(tracks.map(t => [t.id, t])).values()
     );
     
-    // Get audio features for all tracks
-    const trackIds = uniqueTracks.map(t => t.id).filter(Boolean);
-    const audioFeatures = await spotify.tracks.audioFeatures(trackIds);
-    
-    // Combine track info with audio features
-    const tracksWithFeatures = uniqueTracks.map((track, i) => ({
-      id: track.id,
-      name: track.name,
-      artist: track.artists[0]?.name,
-      album: track.album?.name,
-      imageUrl: track.album?.images[0]?.url,
-      spotifyUrl: track.external_urls?.spotify,
-      previewUrl: track.preview_url,
-      duration_ms: track.duration_ms,
-      // Audio features
-      valence: audioFeatures[i]?.valence || 0.5,
-      energy: audioFeatures[i]?.energy || 0.5,
-      danceability: audioFeatures[i]?.danceability || 0.5,
-      acousticness: audioFeatures[i]?.acousticness || 0.5,
-      instrumentalness: audioFeatures[i]?.instrumentalness || 0.0,
-      tempo: audioFeatures[i]?.tempo || 120,
-      loudness: audioFeatures[i]?.loudness || -10,
-    }));
+    // Skip audio features and recommendations API (requires user auth)
+    // Instead, use basic track info with estimated features based on mood
+    const tracksWithFeatures = uniqueTracks.map((track) => {
+      return {
+        id: track.id,
+        name: track.name || "Unknown Track",
+        artist: track.artists?.[0]?.name || "Unknown Artist",
+        album: track.album?.name || "Unknown Album",
+        imageUrl: track.album?.images?.[0]?.url || null,
+        spotifyUrl: track.external_urls?.spotify || null,
+        previewUrl: track.preview_url || null,
+        duration_ms: track.duration_ms || 0,
+        // Estimated audio features based on mood (since we can't access the API)
+        valence: (features as any).valence?.target || 0.5,
+        energy: (features as any).energy?.target || 0.5,
+        danceability: (features as any).danceability?.target || 0.5,
+        acousticness: (features as any).acousticness?.target || 0.5,
+        instrumentalness: (features as any).instrumentalness?.target || 0.0,
+        tempo: (features as any).tempo?.target || 120,
+        loudness: (features as any).loudness?.target || -10,
+      };
+    });
     
     // Use scikit-learn recommender to rank and filter tracks
     const recommendedTracks = await runSongRecommender(mood, tracksWithFeatures);
